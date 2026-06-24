@@ -28,5 +28,6 @@ dashboard.token
 
 # Personal / local — not for the repo
 .claude/
+claude/
 apps/ios/DEPLOY.md
 portal-figure-orb.webm
