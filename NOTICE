@@ -1,6 +1,20 @@
 HermesMobile — native iOS app & gateway plugin for self-hosted Hermes.
-Copyright (c) 2026 ab0991-oss.
+Personal, pt-BR-localized fork.
+Copyright (c) 2026 Giovanni Della Dea.
 
-This product includes software from hermes-agent
-(https://github.com/NousResearch/hermes-agent), Copyright (c) 2025 Nous Research,
+This project is a fork of hermes-ios
+(https://github.com/ab0991-oss/hermes-ios), Copyright (c) 2026 ab0991-oss,
 licensed under the MIT License. That copyright notice is retained per the MIT terms.
+
+It includes software from hermes-agent
+(https://github.com/NousResearch/hermes-agent), Copyright (c) 2025 Nous Research,
+licensed under the MIT License (the gateway seam patch in
+dist/hermes-mobile/seams.patch derives from it). That copyright notice is retained.
+
+Artwork, texture & branding — © Nous Research.
+The cold-launch splash animation (the "psyche" figure holding the orb), the
+"nous" backdrop texture, and the "nous" theme/palette used in this app are
+Nous Research brand assets, drawn from the Hermes design system / hermes-agent,
+and are reproduced here with attribution. They are Nous Research's intellectual
+property; confirm usage rights with Nous Research before redistributing this fork
+publicly.

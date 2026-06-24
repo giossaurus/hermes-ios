@@ -5,6 +5,13 @@ notifications + Live Activities, device pairing, and file/attachment support —
 talking directly to **your own** `hermes-agent` gateway. No third‑party servers:
 the app connects only to the gateway you run.
 
+> **Personal fork (pt-BR).** This is a personal, Brazilian-Portuguese-localized
+> fork of **[ab0991-oss/hermes-ios](https://github.com/ab0991-oss/hermes-ios)** (the
+> iOS app), which builds on **[NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)**
+> (the gateway). Splash/backdrop artwork and the "nous" theme are © Nous Research.
+> Full attribution in [NOTICE](NOTICE) / [License & credits](#license--credits) —
+> and see [what this fork adds](#what-this-fork-adds).
+
 ---
 
 ## What you need first
@@ -31,7 +38,7 @@ Hermes agent** and let it set everything up:
 Set up the HermesMobile iOS app support on this Hermes gateway for me.
 
 1. Clone the project and run its installer against this hermes-agent checkout:
-   git clone https://github.com/ab0991-oss/hermes-ios.git
+   git clone https://github.com/giossaurus/hermes-ios.git
    hermes-ios/dist/hermes-mobile/install.sh "$(pwd)"
    (add --dry-run after the path first if you want to preview the changes.)
 2. Export these (the installer prints the exact values), then restart the gateway:
@@ -54,7 +61,7 @@ From the root of your `hermes-agent` checkout:
 ```bash
 # 1. Clone this repo and run the installer against your hermes-agent checkout
 #    (additive — stock files are only extended; add --dry-run to preview).
-git clone https://github.com/ab0991-oss/hermes-ios.git
+git clone https://github.com/giossaurus/hermes-ios.git
 hermes-ios/dist/hermes-mobile/install.sh  /path/to/your/hermes-agent
 
 # 2. Export these (the installer prints them), then restart the gateway.
@@ -72,20 +79,26 @@ Full installer details + rollback: [`dist/hermes-mobile/INSTALL.md`](dist/hermes
 
 ## Get the app on your phone
 
-Pick one:
+> **This fork is build-it-yourself.** The public TestFlight link below is the
+> **original author's** upstream build (in English) — **not** this pt-BR fork. To run
+> *this* version you build it yourself (Option 2); to install it over-the-air, publish
+> it to **your own** TestFlight under your Apple Developer account.
 
-### Option 1 — Join the TestFlight beta (easiest)
+### Option 1 — Original author's TestFlight (upstream, English — not this fork)
+
+The upstream public beta, maintained by
+[ab0991-oss](https://github.com/ab0991-oss/hermes-ios):
 
 1. Install Apple's **TestFlight** app (from the App Store).
 2. Open the public invite link: **https://testflight.apple.com/join/TeMvfFaS**
 3. Tap **Install** to get the app.
 
-### Option 2 — Build it yourself (full control)
+### Option 2 — Build this fork yourself (pt-BR)
 
 Requirements: a Mac with **Xcode 26+**, an Apple ID for signing.
 
 ```bash
-git clone https://github.com/ab0991-oss/hermes-ios.git
+git clone https://github.com/giossaurus/hermes-ios.git   # this pt-BR fork
 cd hermes-ios/apps/ios
 brew install xcodegen           # if you don't have it
 xcodegen generate               # generates HermesMobile.xcodeproj
@@ -94,7 +107,8 @@ open HermesMobile.xcodeproj
 
 In Xcode: pick your team under **Signing & Capabilities**, select your iPhone,
 and **Run**. (First run on a personal team: trust the developer profile under
-Settings → General → VPN & Device Management.)
+Settings → General → VPN & Device Management.) To install over-the-air, archive and
+upload to **your own** TestFlight.
 
 ---
 
@@ -119,6 +133,23 @@ Settings → General → VPN & Device Management.)
 - Live Activities + Dynamic Island — watch a turn run from the lock screen.
 - Home‑screen widgets (status, usage).
 - File browse + attachment upload, voice dictation, Face ID lock.
+
+---
+
+## What this fork adds
+
+On top of upstream, this fork adds:
+
+- **Brazilian-Portuguese (pt-BR) localization** with an **in-app language switcher**
+  (Settings → Language) that applies **live, no restart**. English ⇄ Português;
+  product/technical terms (Hermes, Skills, Gateway, Token, model names) stay in English.
+- **"nous" theme backdrop** — a warm corner glow + subtle texture behind the chat,
+  matching the Hermes desktop look (assets © Nous Research — see [NOTICE](NOTICE)).
+- **Cold-launch splash** — a `#0000F2` brand screen with the Nous "psyche" animation
+  and a HERMES / AGENT wordmark, crossfading into the app.
+- **Original app icon** restored, plus a small **Swift 6 concurrency-warning** cleanup.
+
+Roadmap + fork-specific limitations: see [Known issues](apps/ios/KNOWN-ISSUES.md).
 
 ---
 
@@ -160,13 +191,20 @@ Apple's APNs using **your** gateway's signing key. Full policy:
 
 ## Support
 
-Questions / bugs: open an issue at https://github.com/ab0991-oss/hermes-ios/issues.
+Questions / bugs: open an issue at https://github.com/giossaurus/hermes-ios/issues.
 
 ---
 
-## License
+## License & credits
 
-MIT — see [LICENSE](LICENSE). The gateway seam patch
-(`dist/hermes-mobile/seams.patch`) derives from
-[NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) (MIT);
-that copyright notice is retained.
+MIT — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+- **iOS app** — forked from [ab0991-oss/hermes-ios](https://github.com/ab0991-oss/hermes-ios) (MIT).
+- **Gateway** — [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) (MIT);
+  the seam patch (`dist/hermes-mobile/seams.patch`) derives from it.
+- **Artwork & branding** — the splash animation (the "psyche" figure), the backdrop
+  texture, and the "nous" theme are **© Nous Research**, from the Hermes design system,
+  reproduced here with attribution. These are Nous Research brand assets (not the MIT
+  code); confirm usage rights before redistributing publicly. See [NOTICE](NOTICE).
+
+This fork is © 2026 Giovanni Della Dea, for personal pt-BR use.
