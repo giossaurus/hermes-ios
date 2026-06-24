@@ -82,7 +82,7 @@ public final class StateServer {
 
     // Agent identity for the DebugOverlay attribution chip. Display-only,
     // never used for auth.
-    public private(set) var lastAgentIdentity: String = "Claude Code (local)"
+    public private(set) var lastAgentIdentity: String = "Hermes Mobile (local)"
 
     // MARK: Lifecycle
 

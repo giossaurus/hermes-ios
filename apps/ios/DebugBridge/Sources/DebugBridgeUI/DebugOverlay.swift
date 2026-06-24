@@ -18,8 +18,11 @@ public final class DebugOverlayWindow {
     public static let shared = DebugOverlayWindow()
 
     private var window: UIWindow?
+    private static let suppressOverlay =
+        ProcessInfo.processInfo.environment["HERMES_NO_DEBUG_OVERLAY"] == "1"
 
     public func install(recording: Bool = false) {
+        guard !Self.suppressOverlay else { return }
         guard window == nil else { return }
         guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
 
@@ -52,7 +55,7 @@ private final class PassThroughWindow: UIWindow {
 @MainActor
 final class OverlayAttributionState: ObservableObject {
     static let shared = OverlayAttributionState()
-    @Published var identity: String = "Claude Code (local)"
+    @Published var identity: String = "Hermes Mobile (local)"
 }
 
 private struct OverlayRoot: View {

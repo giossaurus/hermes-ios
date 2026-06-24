@@ -21,14 +21,25 @@ import DebugBridgeUI
 @MainActor
 func startGstackDebugBridge(environment: AppEnvironment) {
     // Recording mode draws the on-device "AGENT DEMO" watermark; opt in via
-    // the launch argument the daemon passes for screencasts.
-    let recording = ProcessInfo.processInfo.arguments.contains("--gstack-recording")
+    // the launch argument the daemon passes for screencasts. (Only consumed by
+    // the DebugOverlay install below, which is disabled locally — un-comment
+    // both lines together to restore.)
+    // let recording = ProcessInfo.processInfo.arguments.contains("--gstack-recording")
 
     // Install the UIKit-backed bridges (screenshot / elements / mutation) and
     // the DebugOverlay before the server starts, so the first authenticated
     // request can use them.
+    //
+    // DISABLED locally: `installAll` also installs the on-device DebugOverlay —
+    // the animated rotating brand border + attribution chip — which is just a
+    // QA presence indicator and is distracting during manual UI work. Skipping
+    // the call removes it for EVERY launch method (Xcode Run, tap-to-open,
+    // local install), unlike the HERMES_NO_DEBUG_OVERLAY env var which only
+    // applies when Xcode launches the process. To restore the overlay + the
+    // screenshot/element/mutation bridges (e.g. for gstack QA automation),
+    // un-comment the call below.
     #if canImport(UIKit)
-    DebugBridgeUIWiring.installAll(recording: recording)
+    // DebugBridgeUIWiring.installAll(recording: recording)
     #endif
 
     // Boot StateServer (loopback-only) and register the generated read
