@@ -91,6 +91,7 @@ struct SettingsView: View {
     /// name inline and the picker push can bind to it. The hosting sheet applies
     /// `.hermesThemed` at the presentation site (see the presentation contract).
     @Environment(ThemeStore.self) private var themeStore
+    @Environment(LocalizationManager.self) private var localization
     @Environment(\.hermesTheme) private var theme
     /// Dismisses the sheet from the X item. F1 needs no `onDismiss`.
     @Environment(\.dismiss) private var dismiss
@@ -312,6 +313,23 @@ struct SettingsView: View {
             }
             .listRowBackground(theme.card)
             .accessibilityIdentifier("settingsAppearanceRow")
+
+            // UI language — in-app switch (pt-BR / English / follow system).
+            // Applies live via ``LocalizationManager`` (no app restart).
+            Picker(selection: Binding(
+                get: { localization.language },
+                set: { localization.setLanguage($0) }
+            )) {
+                ForEach(LocalizationManager.Language.allCases) { lang in
+                    Text(lang.displayName).tag(lang)
+                }
+            } label: {
+                Label("Language", systemImage: "globe")
+                    .foregroundStyle(theme.fg)
+            }
+            .tint(theme.mutedFg)
+            .listRowBackground(theme.card)
+            .accessibilityIdentifier("settingsLanguagePicker")
 
             // Control panels — each pushes within this sheet's stack.
             if connectionStore.control != nil {
@@ -562,7 +580,7 @@ struct SettingsView: View {
             [.model, .personality, .usage, .cron, .skills, .gateway]
         }
 
-        var title: String {
+        var title: LocalizedStringKey {
             switch self {
             case .appearance: return "Appearance"
             case .model: return "Model"
@@ -720,7 +738,7 @@ private struct SettingsRowLabel: View {
     @Environment(\.hermesTheme) private var theme
 
     let icon: String
-    let title: String
+    let title: LocalizedStringKey
     var destructive: Bool = false
 
     var body: some View {
@@ -741,7 +759,7 @@ private struct SettingsRow: View {
     @Environment(\.hermesTheme) private var theme
 
     let icon: String
-    let title: String
+    let title: LocalizedStringKey
     var value: String?
     var muted: Bool = false
 

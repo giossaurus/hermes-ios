@@ -29,6 +29,11 @@ struct ChatView: View {
     /// Paired with the theme id in each bubble's `Equatable` value (A1): catches an
     /// adaptive theme's light↔dark flip, where the theme name is unchanged.
     @Environment(\.colorScheme) private var colorScheme
+    /// In-app UI locale (re-applied at every themed root). Threaded into the
+    /// draft greeting so its `String(localized:)` phrase follows the in-app
+    /// language switch — `String(localized:)` reads `Locale.current`, NOT the
+    /// SwiftUI `\.locale`, so the resolved locale is passed explicitly.
+    @Environment(\.locale) private var locale
 
     /// Optional hook invoked when the user chooses "Speak" on an assistant
     /// message. Wiring to the speech player happens during integration; nil
@@ -605,9 +610,13 @@ struct ChatView: View {
     private func transcript(proxy: ScrollViewProxy) -> some View {
         ScrollView {
             if isDraft && chatStore.messages.isEmpty {
-                // Fresh draft chat — a centred time-aware greeting instead of an
-                // empty transcript (chat-as-home; serif greeting per F3).
-                draftGreeting
+                // Fresh draft chat — the time-aware greeting is rendered as a
+                // CENTRED OVERLAY on the scroll viewport (see `.overlay` below),
+                // not in the scroll flow, so it sits at the true vertical centre.
+                // (`containerRelativeFrame` inside the scroll resolved to the
+                // intrinsic height and pinned it to the top.) Keep the in-flow
+                // branch empty.
+                Color.clear.frame(height: 0)
             } else if chatStore.messages.isEmpty && chatStore.transcriptGeneration == 0 {
                 if let loadError = chatStore.lastBackfillError {
                     // The seed/backfill failed — a recoverable error beats an
@@ -821,7 +830,19 @@ struct ChatView: View {
             if nowAtBottom != atBottom { atBottom = nowAtBottom }
         })
         // Full-bleed background (no viewport-capture GeometryReader needed).
-        .background { theme.bg.ignoresSafeArea() }
+        // For the `nous` palette this paints the desktop-style backdrop (warm
+        // glow + faint texture) over `theme.bg`; every other palette renders the
+        // flat `theme.bg` unchanged. See ``HermesSurfaceBackground``.
+        .background { HermesSurfaceBackground(theme: theme).ignoresSafeArea() }
+        // Draft greeting, centred on the viewport. As an overlay (not scroll
+        // flow) it uses the ScrollView's real rendered size, so it lands at the
+        // true vertical centre rather than the top.
+        .overlay {
+            if isDraft && chatStore.messages.isEmpty {
+                draftGreeting
+                    .allowsHitTesting(false)
+            }
+        }
         // KEYBOARD: observe height, feed into clearance spacer.
         .modifier(KeyboardHeightReader(height: $keyboardHeight))
         // FIX 3: re-park atBottom on user's own outgoing turn so the streaming
@@ -963,33 +984,66 @@ struct ChatView: View {
         VStack(spacing: 16) {
             Image(systemName: "sparkles")
                 .font(.largeTitle)
-                .foregroundStyle(theme.midground)
+                .foregroundStyle(greetingGlyphColor)
                 .accessibilityHidden(true)
-            Text(greetingText)
+            greetingTextView
                 .font(.system(.title, design: .serif).weight(.regular))
                 .foregroundStyle(theme.fg)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 120)
         .padding(.horizontal, 24)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(greetingText)
     }
 
-    /// The time-aware greeting string shown on the draft canvas.
+    /// Tint for the draft greeting glyph. nous *dark* paints a blue glyph
+    /// (`midground` #0053FD) on a blue canvas (`bg` #0D2F86) — it disappears —
+    /// so it uses white there. nous *light* keeps the blue (it reads fine on the
+    /// near-white canvas), and every other theme keeps its brand-colored glyph.
+    private var greetingGlyphColor: Color {
+        if theme.name == "nous" && colorScheme == .dark { return .white }
+        return theme.midground
+    }
+
+    /// The time-aware greeting string shown on the draft canvas. Kept (String)
+    /// for the accessibility label + unit tests.
     private var greetingText: String {
-        Self.greeting(phrase: Self.timeOfDayPhrase(), name: DefaultsKeys.displayNameValue())
+        Self.greeting(phrase: Self.timeOfDayPhrase(locale: locale), name: DefaultsKeys.displayNameValue())
+    }
+
+    /// The greeting as a `Text` so the time-of-day phrase resolves as a
+    /// `LocalizedStringKey` against `Bundle.main` — which the in-app language
+    /// switch reclasses — exactly like every other localized string in the app.
+    /// `String(localized:locale:)` (used by ``greetingText``) does NOT follow the
+    /// runtime bundle swap, so it must not drive the VISIBLE greeting.
+    private var greetingTextView: Text {
+        let phrase = Text(Self.timeOfDayKey())
+        if let name = DefaultsKeys.displayNameValue() {
+            return phrase + Text(verbatim: ", \(name)")
+        }
+        return phrase + Text(verbatim: ".")
+    }
+
+    /// `LocalizedStringKey` for the current time-of-day phrase, resolved by
+    /// ``Text`` against the (reclassed) main bundle.
+    static func timeOfDayKey(_ date: Date = Date(), calendar: Calendar = .current) -> LocalizedStringKey {
+        let hour = calendar.component(.hour, from: date)
+        switch hour {
+        case 5..<12: return "greeting.morning"
+        case 12..<17: return "greeting.afternoon"
+        default: return "greeting.evening"
+        }
     }
 
     /// "Morning" / "Afternoon" / "Evening" from the current hour. Pure + static
     /// so the greeting is testable.
-    static func timeOfDayPhrase(_ date: Date = Date(), calendar: Calendar = .current) -> String {
+    static func timeOfDayPhrase(_ date: Date = Date(), calendar: Calendar = .current, locale: Locale = .current) -> String {
         let hour = calendar.component(.hour, from: date)
         switch hour {
-        case 5..<12: return "Morning"
-        case 12..<17: return "Afternoon"
-        default: return "Evening"
+        case 5..<12: return String(localized: "greeting.morning", defaultValue: "Morning", locale: locale)
+        case 12..<17: return String(localized: "greeting.afternoon", defaultValue: "Afternoon", locale: locale)
+        default: return String(localized: "greeting.evening", defaultValue: "Evening", locale: locale)
         }
     }
 
@@ -1752,6 +1806,7 @@ private struct TranscriptEdgeEffect: ViewModifier {
 /// edge, accelerating to full opacity at the clear band) rather than a flat line.
 private struct EdgeFadeMask: ViewModifier {
     let enabled: Bool
+    @Environment(\.colorScheme) private var colorScheme
 
     /// Height of each fade band, in points.
     /// Top: spans the status bar + the floating header pills so content is fully
@@ -1792,6 +1847,21 @@ private struct EdgeFadeMask: ViewModifier {
         (1.00, 1.00)
     ]
 
+    /// In dark mode, an ultra-low shoulder (near 0 alpha for a long portion of
+    /// the top band) reads like a persistent dark blur above the transcript.
+    /// Keep the same geometry, but soften the curve so content remains subtly
+    /// present near the edge while still fading under the floating header.
+    private static let darkEaseStops: [(frac: CGFloat, alpha: Double)] = [
+        (0.00, 0.14),
+        (0.28, 0.18),
+        (0.46, 0.30),
+        (0.62, 0.46),
+        (0.76, 0.66),
+        (0.88, 0.84),
+        (0.96, 0.94),
+        (1.00, 1.00)
+    ]
+
     func body(content: Content) -> some View {
         if enabled {
             content.mask(alignment: .top) {
@@ -1799,8 +1869,9 @@ private struct EdgeFadeMask: ViewModifier {
                     let h = max(proxy.size.height, 1)
                     let topBand = min(0.5, topFade / h)
                     let bottomBand = min(0.5, bottomFade / h)
+                    let stops = colorScheme == .dark ? Self.darkEaseStops : Self.easeStops
                     LinearGradient(
-                        stops: Self.maskStops(topBand: topBand, bottomBand: bottomBand),
+                        stops: Self.maskStops(topBand: topBand, bottomBand: bottomBand, easeStops: stops),
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -1814,7 +1885,11 @@ private struct EdgeFadeMask: ViewModifier {
     /// Build the full gradient: eased ramp UP across the top band, solid black
     /// (full content) through the clear middle, eased ramp DOWN across the bottom
     /// band. Locations are absolute (0...1) over the transcript height.
-    private static func maskStops(topBand: CGFloat, bottomBand: CGFloat) -> [Gradient.Stop] {
+    private static func maskStops(
+        topBand: CGFloat,
+        bottomBand: CGFloat,
+        easeStops: [(frac: CGFloat, alpha: Double)]
+    ) -> [Gradient.Stop] {
         var stops: [Gradient.Stop] = []
         // Top edge: edge (frac 0) → clear band (frac 1), mapped into [0, topBand].
         for s in easeStops {

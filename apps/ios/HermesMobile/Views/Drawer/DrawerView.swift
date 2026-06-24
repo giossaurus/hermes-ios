@@ -740,7 +740,7 @@ struct DrawerView: View {
                     sessionRow(summary, pinned: true)
                 }
             } header: {
-                DrawerSectionHeader(title: "Pinned")
+                DrawerSectionHeader(title: String(localized: "Pinned"))
             }
         }
     }
@@ -920,7 +920,7 @@ struct DrawerView: View {
             // No filters hiding rows, more pages remain.
             return "Recents · \(loaded) of \(total!)"
         case (false, false):
-            return "Recents"
+            return String(localized: "Recents")
         }
     }
 
@@ -1093,7 +1093,7 @@ struct DrawerView: View {
                     }
                 }
             } header: {
-                DrawerSectionHeader(title: "Results")
+                DrawerSectionHeader(title: String(localized: "Results"))
             }
         }
     }
@@ -1356,7 +1356,7 @@ struct DrawerView: View {
 private struct DrawerNavRow: View {
     @Environment(\.hermesTheme) private var theme
 
-    let title: String
+    let title: LocalizedStringKey
     let systemImage: String
     var badge: Int = 0
     var isActive: Bool = false
@@ -1393,7 +1393,8 @@ private struct DrawerNavRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(badge > 0 ? "\(title), \(badge) pending" : title)
+        .accessibilityLabel(title)
+        .accessibilityValue(badge > 0 ? "\(badge) pending" : "")
         .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
         .accessibilityIdentifier(identifier ?? "")
     }

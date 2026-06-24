@@ -10,6 +10,14 @@ struct HermesMobileApp: App {
     /// Carries a deferred `hermesapp://pair` payload from `onOpenURL` up to the
     /// confirmation UI in `RootView` (re-pairing while connected is destructive).
     @State private var deepLink = DeepLinkCoordinator()
+    /// In-app UI language (pt-BR / English / system). Owned at the app root so the
+    /// chosen `\.locale` propagates to the whole tree and `Text`/`String(localized:)`
+    /// re-resolve live when the user switches language in Settings.
+    @State private var localization = LocalizationManager()
+    /// Cold-launch brand splash gate. `@State` is fresh per process, so this is
+    /// `true` only on a genuine cold launch — a warm foreground resume keeps the
+    /// already-dismissed value, so the splash never replays on resume.
+    @State private var showSplash = true
     @Environment(\.scenePhase) private var scenePhase
     /// APNs token callbacks only reach a `UIApplicationDelegate`; this adaptor
     /// forwards them to `PushRegistrar` (see ``AppDelegate``).
@@ -78,6 +86,29 @@ struct HermesMobileApp: App {
                 // because SwiftUI does not reliably inherit custom environment
                 // values across presentation boundaries.
                 .hermesThemed(environment.themeStore)
+                // In-app UI language. Injected OUTSIDE `.hermesThemed` ON PURPOSE:
+                // that modifier re-applies `\.locale` at EVERY root (app + sheets)
+                // by reading this manager, and — being a ViewModifier — re-renders
+                // reactively when the user switches language, with no app restart.
+                // If injected inside, the app-root `hermesThemed` would read nil
+                // and pin the system language (only sheets, which inherit it via
+                // presentation, would switch). The previous explicit
+                // `.environment(\.locale, …)` is gone: read in the App's Scene
+                // body it was pinned to the launch locale (Scene bodies do not
+                // re-evaluate on @State change), which then overrode the live one.
+                .environment(localization)
+                // Cold-launch brand splash, above the whole UI (RootView forks
+                // its phase switch immediately, so the splash must sit over it).
+                // The bootstrap `.task` below keeps running underneath, so the
+                // ~2.8s clip overlaps connection setup for free.
+                .overlay {
+                    if showSplash {
+                        // SplashView crossfades ITSELF out (incl. the AVPlayerLayer)
+                        // before calling back, so the overlay is already invisible
+                        // here — just remove it, no extra animation/transition.
+                        SplashView(onFinish: { showSplash = false })
+                    }
+                }
                 .task {
                     #if DEBUG
                     // DEBUG-only main-thread hitch logger (HERMES_PERF_LOG=1). Cheap,
