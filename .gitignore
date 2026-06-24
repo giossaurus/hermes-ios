@@ -25,3 +25,8 @@ venv/
 *.mobileprovision
 dashboard.token
 .env
+
+# Personal / local — not for the repo
+.claude/
+apps/ios/DEPLOY.md
+portal-figure-orb.webm
