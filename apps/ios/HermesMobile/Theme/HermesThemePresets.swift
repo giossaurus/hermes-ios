@@ -264,8 +264,13 @@ enum HermesThemePresets {
     /// Default skin when nothing is persisted or the saved name is retired.
     static let defaultName = "nous"
 
-    /// Look up a set by persisted name, falling back to `nous`.
+    /// Canonical default set resolved from ``defaultName``.
+    static var defaultSet: HermesThemeSet {
+        all.first { $0.name == defaultName } ?? nous
+    }
+
+    /// Look up a set by persisted name, falling back to the current default set.
     static func set(named name: String) -> HermesThemeSet {
-        all.first { $0.name == name } ?? nous
+        all.first { $0.name == name } ?? defaultSet
     }
 }
