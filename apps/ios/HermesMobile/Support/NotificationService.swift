@@ -383,7 +383,7 @@ enum NotificationService {
             // Latch "asked once" only AFTER the dialog resolves (release
             // audit): setting it before meant an app kill mid-dialog consumed
             // the one-shot without an answer — the prompt never re-showed.
-            defaults.set(true, forKey: DefaultsKeys.notificationsDidRequestAuthorization)
+            UserDefaults.standard.set(true, forKey: DefaultsKeys.notificationsDidRequestAuthorization)
         }
     }
 

@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import SwiftUI
 import UIKit
 
@@ -79,7 +79,7 @@ struct QRCameraView: UIViewRepresentable {
 
         /// Build the input/output graph and start running. Idempotent-safe: only
         /// called once from `makeUIView`.
-        func configure(previewView: PreviewView) {
+        @MainActor func configure(previewView: PreviewView) {
             previewView.previewLayer.session = session
             previewView.previewLayer.videoGravity = .resizeAspectFill
 

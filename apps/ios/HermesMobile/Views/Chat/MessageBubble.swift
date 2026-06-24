@@ -603,6 +603,12 @@ struct MessageBubble: View {
                 let paragraph = NSMutableParagraphStyle()
                 paragraph.firstLineHeadIndent = listFirstLineHeadIndent
                 paragraph.headIndent = listHeadIndent
+                // Swift 6 warns here ("NSParagraphStyle: Sendable unavailable")
+                // because AttributedString is Sendable and NSParagraphStyle is
+                // not. The style is built and consumed locally (it never crosses
+                // an isolation boundary), and the only alternative — bridging via
+                // NSAttributedString — drops the markdown inline intents
+                // (bold/italic), so this is left as an accepted framework limit.
                 lineAttr.paragraphStyle = paragraph
                 if marker == .ordered {
                     // Keep numbered ordinals column-aligned across items, in the
