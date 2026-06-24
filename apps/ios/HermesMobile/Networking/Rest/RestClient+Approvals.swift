@@ -135,6 +135,70 @@ extension RestClient {
         }
     }
 
+    // MARK: - Pending-approvals catch-up (reconnect recovery)
+
+    /// `GET <prefix>/approvals/pending` → `{"pending":[...]}`.
+    ///
+    /// The catch-up fetch: re-pulls every approval/clarify the server still holds
+    /// pending, so a prompt the app missed while suspended in the background (a
+    /// dropped WS broadcast) is recovered on reconnect. Soft and non-throwing,
+    /// mirroring ``respondToApproval`` and the spec's gotchas:
+    ///  - non-200 (incl. 401/403 bad-or-missing auth) → `[]` ("show nothing",
+    ///    never an error state).
+    ///  - empty store → `200 {"pending":[]}` → `[]`.
+    ///  - records are decoded tolerantly (`PendingPrompt.init?(record:)`); a
+    ///    malformed entry is skipped, not fatal to the batch.
+    ///
+    /// Self-healing path-family retry (same rationale as `respondToApproval`):
+    /// the cached ``APIPathStyle`` can be stale after a gateway swap, so a `404`
+    /// on the resolved family retries once on the alternate before giving up.
+    func pendingPrompts() async -> [PendingPrompt] {
+        let first = await pendingPromptsAttempt(style: pathStyle)
+        if case .routeMiss = first {
+            if case .ok(let prompts) = await pendingPromptsAttempt(style: pathStyle.alternate) {
+                return prompts
+            }
+            return []
+        }
+        if case .ok(let prompts) = first { return prompts }
+        return []
+    }
+
+    private enum PendingPromptsAttempt {
+        case ok([PendingPrompt])
+        /// 404 — route missing on this family; caller retries the alternate once.
+        case routeMiss
+        /// Any other non-200 / transport / undecodable → treat as empty.
+        case empty
+    }
+
+    private func pendingPromptsAttempt(style: APIPathStyle) async -> PendingPromptsAttempt {
+        let request = makeRequest(
+            path: "\(style.mobileAPIPrefix)/approvals/pending", method: "GET"
+        )
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            return .empty
+        }
+        guard let http = response as? HTTPURLResponse else { return .empty }
+        switch http.statusCode {
+        case 200, 201:
+            guard
+                let root = try? decodeJSONValue(from: data, context: "approvals/pending"),
+                let array = root["pending"]?.arrayValue
+            else { return .ok([]) }
+            return .ok(array.compactMap(PendingPrompt.init(record:)))
+        case 404:
+            return .routeMiss
+        default:
+            // 401/403 bad-or-missing auth, 5xx, etc. → show nothing, not an error.
+            return .empty
+        }
+    }
+
     // MARK: - Live Activity token registration (A3)
 
     /// Result of a Live-Activity token register/unregister call. Soft, never a

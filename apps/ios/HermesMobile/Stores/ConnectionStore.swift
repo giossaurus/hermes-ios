@@ -757,6 +757,10 @@ final class ConnectionStore {
         // Hygiene (WhatsApp bar): run the daily-throttled eviction sweep so the
         // cache never grows unbounded. Self-throttled to once/24h in CacheStore.
         sessionStore.runEvictionIfNeeded()
+        // Recover any pending approval/clarify already waiting on the server at
+        // first connect (e.g. a Telegram-driven prompt raised before the app
+        // opened) — same catch-up the reconnect path runs.
+        catchUpPendingPrompts()
     }
 
     // MARK: - Disconnect
@@ -1295,6 +1299,24 @@ final class ConnectionStore {
         // CACHE-FIRST coverage (WhatsApp bar): re-warm the recent transcripts now
         // the list is current again — covers sessions that moved while offline.
         sessionStore.prefetchRecentTranscripts()
+        // Recover any approval/clarify prompt whose live WS broadcast we missed
+        // while suspended (the catch-up that makes a background-suspend a
+        // non-event for pending approvals).
+        catchUpPendingPrompts()
+    }
+
+    /// Fire-and-forget catch-up of server-side pending approvals/clarifies into
+    /// the inbox. Runs on initial connect, every reconnect, and on foreground —
+    /// the same hooks as transcript `backfill()` — so a prompt the app missed
+    /// while iOS had it suspended (a dropped WS broadcast) is still recovered.
+    ///
+    /// Non-throwing by construction: ``RestClient/pendingPrompts()`` maps every
+    /// non-200 (incl. 401/403) to an empty batch, so a transient failure shows
+    /// nothing rather than an error — the live broadcast stays the primary path
+    /// and the gateway GCs stale records after their ttl.
+    private func catchUpPendingPrompts() {
+        guard let rest, let inboxStore else { return }
+        Task { inboxStore.catchUp(await rest.pendingPrompts()) }
     }
 
     // MARK: - Scene phase
@@ -1347,6 +1369,10 @@ final class ConnectionStore {
                 self.startReconnectLoop()
             } else if case .connected = self.phase {
                 await self.chatStore.backfill()
+                // Re-pull pending approvals on foreground: a prompt may have been
+                // raised (or another client may have left one) while the app was
+                // backgrounded on a still-live socket — recover it into the inbox.
+                self.catchUpPendingPrompts()
                 // refresh the session list on foreground so the
                 // drawer reflects changes made on other clients while the app
                 // was backgrounded. Uses the shared coalesced seam so a

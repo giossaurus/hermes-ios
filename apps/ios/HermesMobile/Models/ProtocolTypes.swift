@@ -570,6 +570,57 @@ struct ClarifyRequestPayload: Sendable, Equatable {
     }
 }
 
+/// One record from `GET <prefix>/approvals/pending` — the full stored entry from
+/// the server's pending store (`approvals_pending.jsonl`). This is the catch-up
+/// surface: when the app misses a live `approval.request`/`clarify.request`
+/// broadcast (iOS suspended it in the background), it re-fetches the pending set
+/// on reconnect and merges it into the inbox.
+///
+/// Decoded TOLERANTLY from a raw `JSONValue` rather than via strict `Codable`:
+/// only `kind`, `approval_id`, and `session_id` are required; every other field
+/// is optional and unknown/extra keys (`op`, `origin_pid`, future additions) are
+/// ignored. The field names line up with the WS payloads, so `payload` is the
+/// raw record (with `id` injected = `approval_id`) fed straight through the
+/// existing ``ApprovalRequestPayload``/``ClarifyRequestPayload`` parsers.
+struct PendingPrompt: Sendable, Equatable, Identifiable {
+    enum Kind: String, Sendable { case approval, clarify }
+
+    /// `approval_id` — stable identity + dedup key against the live WS path.
+    let id: String
+    let kind: Kind
+    /// Runtime session id — the `session_id` echoed back to respond.
+    let sessionId: String
+    let storedSessionId: String?
+    let createdAt: Double?
+    let ttl: Int?
+    /// The raw record as an object, with `id` set to `approval_id`, ready for the
+    /// shared payload parsers.
+    let payload: JSONValue
+
+    /// Parse one record. Returns `nil` when a required field is missing or `kind`
+    /// is unrecognized, so a malformed/garbage line is skipped, not fatal.
+    init?(record: JSONValue) {
+        guard
+            let kindRaw = record["kind"]?.stringValue,
+            let kind = Kind(rawValue: kindRaw),
+            let approvalId = record["approval_id"]?.stringValue, !approvalId.isEmpty,
+            let sessionId = record["session_id"]?.stringValue, !sessionId.isEmpty
+        else { return nil }
+        self.id = approvalId
+        self.kind = kind
+        self.sessionId = sessionId
+        let stored = record["stored_session_id"]?.stringValue
+        self.storedSessionId = (stored?.isEmpty == false) ? stored : nil
+        self.createdAt = record["created_at"]?.doubleValue
+        self.ttl = record["ttl"]?.intValue
+        // Inject `id` (= approval_id) so the approval parser keys identity off it
+        // instead of synthesizing a UUID; harmless for clarify (keyed by session).
+        var object = record.objectValue ?? [:]
+        object["id"] = .string(approvalId)
+        self.payload = .object(object)
+    }
+}
+
 // MARK: - REST
 
 /// `GET /api/status` response (subset the app cares about).

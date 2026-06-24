@@ -133,6 +133,13 @@ final class InboxStore {
 
     private var connection: ConnectionStore?
 
+    /// Ids the user has already answered/dismissed this session. The catch-up
+    /// fetch (``catchUp(_:)``) consults this so a server record that hasn't been
+    /// GC'd yet (the store keeps entries until `created_at + ttl`) can't
+    /// resurrect a row the user just cleared. Bounded to the most recent ids.
+    private var answeredIds: [String] = []
+    private static let answeredIdCap = 256
+
     init() {}
 
     /// Wire up the gateway client back-reference. Called exactly once by
@@ -201,6 +208,67 @@ final class InboxStore {
             state: .pending
         )
         insert(item)
+    }
+
+    // MARK: - Catch-up (reconnect recovery)
+
+    /// Merge a catch-up batch from `GET /approvals/pending` into the inbox.
+    ///
+    /// Called on (re)connect and on foreground so prompts the app missed while
+    /// suspended in the background (a dropped WS broadcast) are recovered — the
+    /// fix for "the approval card never appears after the app reconnects". Reuses
+    /// the live path's payload parsers AND its id scheme, so a recovered prompt
+    /// dedups against one already received over the socket:
+    ///  - approvals key off `approval_id` (the gateway's stable id);
+    ///  - clarifications key off `clarify:<sessionId>` (they carry no stable
+    ///    wire id, matching ``ingestClarify``).
+    ///
+    /// A record is skipped when its id is already present (live event wins) or
+    /// was already answered/dismissed this session (``answeredIds`` — stops a
+    /// not-yet-GC'd server record from re-adding a just-cleared row). Records
+    /// past `created_at + ttl` land as `.expired` so a stale prompt greys out
+    /// rather than inviting an answer the gateway has already dropped.
+    func catchUp(_ prompts: [PendingPrompt]) {
+        for prompt in prompts {
+            let kind: Kind = prompt.kind == .approval ? .approval : .clarify
+            let id = kind == .approval ? prompt.id : "clarify:\(prompt.sessionId)"
+            guard !answeredIds.contains(id),
+                  !items.contains(where: { $0.id == id }) else { continue }
+
+            let payload: Payload = kind == .approval
+                ? .approval(ApprovalRequestPayload(payload: prompt.payload))
+                : .clarify(ClarifyRequestPayload(payload: prompt.payload))
+            let receivedAt = prompt.createdAt.map { Date(timeIntervalSince1970: $0) } ?? Date()
+            let item = Item(
+                id: id,
+                sessionId: prompt.sessionId,
+                storedSessionId: prompt.storedSessionId,
+                kind: kind,
+                payload: payload,
+                receivedAt: receivedAt,
+                state: isExpired(prompt) ? .expired : .pending
+            )
+            insertPreservingOrder(item)
+        }
+    }
+
+    /// Whether a catch-up record is past its server-side validity window
+    /// (`created_at + ttl`). Without both fields it is treated as live.
+    private func isExpired(_ prompt: PendingPrompt) -> Bool {
+        guard let createdAt = prompt.createdAt, let ttl = prompt.ttl else { return false }
+        return Date().timeIntervalSince1970 > createdAt + Double(ttl)
+    }
+
+    /// Insert a catch-up item keeping the list newest-first by `receivedAt`.
+    /// Live items (`insert`) prepend with `receivedAt == now`; catch-up items
+    /// carry the older server `created_at`, so a plain prepend would mis-order
+    /// them — slot each at the first position older than it instead.
+    private func insertPreservingOrder(_ item: Item) {
+        if let index = items.firstIndex(where: { $0.receivedAt < item.receivedAt }) {
+            items.insert(item, at: index)
+        } else {
+            items.append(item)
+        }
     }
 
     /// Insert (or replace) an item, keeping the list newest-first. A repeat of
@@ -275,8 +343,10 @@ final class InboxStore {
         }
     }
 
-    /// Drop an item without answering (user dismissed it).
+    /// Drop an item without answering (user dismissed it). Recorded as answered
+    /// so the catch-up fetch won't re-add it before the server GCs the record.
     func dismiss(_ item: Item) {
+        markAnswered(item.id)
         items.removeAll { $0.id == item.id }
     }
 
@@ -287,9 +357,22 @@ final class InboxStore {
 
     // MARK: - Response bookkeeping
 
-    /// Remove an item by id (optimistic clear on send).
+    /// Remove an item by id (optimistic clear on send). Recorded as answered so
+    /// a catch-up fetch racing the server GC can't resurrect it.
     private func removeItem(id: String) {
+        markAnswered(id)
         items.removeAll { $0.id == id }
+    }
+
+    /// Note an id as answered/dismissed this session (bounded, newest-kept). A
+    /// later ``catchUp(_:)`` skips ids in this list even if the server still
+    /// reports them pending (it holds records until `created_at + ttl`).
+    private func markAnswered(_ id: String) {
+        answeredIds.removeAll { $0 == id }
+        answeredIds.append(id)
+        if answeredIds.count > Self.answeredIdCap {
+            answeredIds.removeFirst(answeredIds.count - Self.answeredIdCap)
+        }
     }
 
     /// Restore a pending item whose response failed to send, so the user can
