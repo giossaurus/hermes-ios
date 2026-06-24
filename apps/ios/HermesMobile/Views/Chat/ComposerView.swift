@@ -347,7 +347,10 @@ struct ComposerView: View {
     /// two-row LAYOUT is retained (no system chat composer exists); every ELEMENT
     /// inside is a system primitive.
     private var composerCard: some View {
-        VStack(spacing: 8) {
+        // Keep the focus ring stable while mention completion is active to avoid
+        // rapid border color toggles (blue flicker) during transient focus churn.
+        let showsFocusRing = isFocused || activeMention != nil
+        return VStack(spacing: 8) {
             composerField
             actionRow
         }
@@ -386,9 +389,8 @@ struct ComposerView: View {
         .modifier(ComposerCardSurface(theme: theme, cornerRadius: 24))
         .overlay(
             RoundedRectangle(cornerRadius: 24)
-                .strokeBorder(isFocused ? theme.composerRing : theme.border, lineWidth: 1)
+                .strokeBorder(showsFocusRing ? theme.composerRing : theme.border, lineWidth: 1)
         )
-        .animation(.easeInOut(duration: 0.15), value: isFocused)
         // Send haptic — the most frequent action, fires on every message sent.
         // `.impact(flexibility:intensity:)` available iOS 17+; maps to the
         // desktop's "submit" haptic pattern (a soft but crisp confirmation
