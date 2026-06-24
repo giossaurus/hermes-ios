@@ -20,12 +20,6 @@ notably **background push is available here** (see Notifications).
 - **Tailnet reachability.** The phone must be able to reach your gateway (same LAN
   or Tailscale). A `*.ts.net` connection failure surfaces an "Is Tailscale
   connected?" hint.
-- **[fork] App-group rename is incomplete — widgets / Live Activity / share-sheet
-  broken.** This fork's entitlements use `group.gio.hermes.app`, but
-  `apps/ios/HermesMobile/Support/SharedStore.swift` still hardcodes the old
-  `group.ai.hermes.app`. Until the constant matches the entitlement, the widget
-  snapshot, Live Activity snapshots, and the share-extension inbox can't cross the
-  process boundary. **One-line fix; first on the roadmap.**
 
 ## Notifications
 

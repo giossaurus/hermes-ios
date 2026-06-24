@@ -1,10 +1,10 @@
 import Foundation
 
 /// Conventions for data shared between the app and its extensions through
-/// the `group.ai.hermes.app` app group: widget snapshots and the share-sheet
+/// the `group.gio.hermes.app` app group: widget snapshots and the share-sheet
 /// inbox. Extensions and app compile this same file into their targets.
 enum SharedStore {
-    static let appGroupID = "group.ai.hermes.app"
+    static let appGroupID = "group.gio.hermes.app"
 
     static var defaults: UserDefaults? {
         UserDefaults(suiteName: appGroupID)

@@ -8,7 +8,7 @@ import WidgetKit
 ///
 
 /// The widgets (X1: `StatusWidget`, `UsageWidget`) read ``SharedStore/WidgetSnapshot``
-/// JSON from `group.ai.hermes.app`; this is the only writer of that key. The
+/// JSON from `group.gio.hermes.app`; this is the only writer of that key. The
 /// snapshot is assembled from values the caller already has on hand — there is no
 /// networking here — so the app stays the single source of truth and the widget
 /// extension never needs gateway access.

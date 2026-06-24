@@ -6,7 +6,7 @@ import Foundation
 
 /// The share extension does no networking — it just persists
 /// ``SharedStore/SharedInboxItem`` JSON (plus any image files) into the
-/// `group.ai.hermes.app` app group. On foreground the app reads those items and,
+/// `group.gio.hermes.app` app group. On foreground the app reads those items and,
 /// for each, opens a brand-new session and submits a "Shared from iPhone" prompt
 /// (attaching any images through the normal upload pipeline), then clears the
 /// inbox. Items are processed **serially, oldest first** so the newest share
